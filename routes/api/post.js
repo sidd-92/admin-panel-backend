@@ -38,33 +38,45 @@ router.get("/", async (req, res) => {
 // @route    POST api/posts
 // @desc     Create a post
 // @access   Private
-router.post("/", upload.single("file"), (req, res) => {
+router.post("/", upload.single("file"), async (req, res) => {
   let fileInfo = {
     name: "",
     url: "",
   };
   try {
-    let params = uploadParams;
-    params.Key = req.file.originalname;
-    params.Body = req.file.buffer;
-    s3Client.upload(params, async (err, data) => {
-      if (err) {
-        res.status(500).json({ error: "Error -> " + err });
-      }
-      fileInfo.name = req.file.originalname;
-      fileInfo.url = data.Location;
-      console.log("File Uploaded Successfully", data.Location);
-      //res.json({ message: "File Uploaded Successfully", url: `${data.Location}` });
+    if (req.file) {
+      let params = uploadParams;
+      params.Key = req.file.originalname;
+      params.Body = req.file.buffer;
+      s3Client.upload(params, async (err, data) => {
+        if (err) {
+          res.status(500).json({ error: "S3 Upload Error -> " + err });
+        }
+        fileInfo.name = req.file.originalname;
+        fileInfo.url = data.Location;
+        console.log("File Uploaded Successfully", data.Location);
+        //res.json({ message: "File Uploaded Successfully", url: `${data.Location}` });
+        const newPost = new Post({
+          title: req.body.title,
+          body: req.body.body,
+          featuredImage: fileInfo,
+        });
+
+        const post = await newPost.save();
+
+        res.json(post);
+      });
+    } else {
       const newPost = new Post({
         title: req.body.title,
         body: req.body.body,
-        featuredImage: fileInfo,
+        featuredImage: "",
       });
 
       const post = await newPost.save();
 
       res.json(post);
-    });
+    }
   } catch (err) {
     console.error(err.message);
     res.status(500).send("Server Error");
